@@ -4,6 +4,7 @@
  */
 package wvec;
 
+import indexer.CompressionUtils;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -72,6 +73,16 @@ public class WordVecs {
             int clusterId = Integer.parseInt(d.get(WordVecsIndexer.FIELD_WORD_VEC));
             clusterMap.put(wordName, clusterId);
         }        
+    }
+
+    // Get the stored centroid vec corresponding to this cluster id
+    public WordVec getCentroidVec(int clusterId) throws Exception {
+        TermQuery tq = new TermQuery(new Term(WordVecsIndexer.FIELD_WORD_VEC, String.valueOf(clusterId)));
+        TopDocs topDocs = searcher.search(tq, 1);
+        Document d = reader.document(topDocs.scoreDocs[0].doc);
+        String centroidvec = CompressionUtils.decompress(d.getBinaryValue(WordVecsIndexer.FIELD_CENTROID_VEC).bytes);
+        WordVec cvec = new WordVec(centroidvec);
+        return cvec;
     }
     
     public void close() throws Exception {

@@ -18,7 +18,7 @@ import org.apache.lucene.util.BytesRef;
  */
 public class CompressionUtils {
 
-    static BytesRef compress(String str) {
+    public static BytesRef compress(String str) {
         ByteArrayOutputStream out = null;
         try {
             out = new ByteArrayOutputStream();

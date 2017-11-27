@@ -126,6 +126,11 @@ public class WordVec implements Comparable<WordVec>, Serializable, Clusterable {
         return this.querySim > that.querySim? -1 : this.querySim == that.querySim? 0 : 1;
     }
     
+    public void scalarMutiply(float alpha) {
+        for (int i=0; i < vec.length; i++)
+            vec[i] = vec[i]*alpha;
+    }
+    
     public byte[] getBytes() throws IOException {
         byte[] byteArray;
         try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
@@ -161,6 +166,14 @@ public class WordVec implements Comparable<WordVec>, Serializable, Clusterable {
     public String toString() {
         StringBuffer buff = new StringBuffer(word);
         buff.append(" ");
+        for (double d : this.vec) {
+            buff.append(d).append(" ");
+        }
+        return buff.toString();
+    }
+    
+    public String getVecStr() {
+        StringBuffer buff = new StringBuffer();
         for (double d : this.vec) {
             buff.append(d).append(" ");
         }

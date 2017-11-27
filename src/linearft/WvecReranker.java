@@ -6,6 +6,7 @@
 package linearft;
 
 import indexer.TrecDocIndexer;
+import org.apache.commons.math3.distribution.MultivariateNormalDistribution;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.index.DirectoryReader;
@@ -20,6 +21,7 @@ import org.apache.lucene.store.RAMDirectory;
 import retriever.WVecLFBRetriever;
 import trec.TRECQuery;
 import wvec.DocVec;
+import wvec.WordVec;
 import wvec.WordVecs;
 
 /**
@@ -37,6 +39,8 @@ public class WvecReranker {
     IndexReader inMemReader;
     IndexSearcher inMemSearcher;
     int numTopDocs;
+    TRECQuery query;
+    double[][] covMatrix;
     
     public WvecReranker(WVecLFBRetriever retriever, TRECQuery query, TopDocs topDocs) throws Exception {
         this.retriever = retriever;
@@ -52,7 +56,7 @@ public class WvecReranker {
         params.initRandom();
         
         inMemReader = DirectoryReader.open(buildInMemIndex());
-        inMemSearcher = new IndexSearcher(inMemReader);
+        inMemSearcher = new IndexSearcher(inMemReader);        
     }
     
     // Useful to compute similarities with different models for reranking
@@ -75,8 +79,27 @@ public class WvecReranker {
         return writer.getDirectory();        
     }
 
-    public void rerank() {
-        params.computeSimilarities(null, inMemSearcher, numTopDocs, numTopDocs);
+    double[][] getCovMatrix(WordVec cvec, float sigma) {
+        if (this.covMatrix!=null)
+            return this.covMatrix;
         
+        int n = cvec.getDimension();
+        double[][] covMatrix = new double[n][n];
+        for (int i=0; i<n; i++)
+            covMatrix[i][i] = sigma;
+        this.covMatrix = covMatrix;
+        return covMatrix;
+    }
+
+    
+    public void rerank() throws Exception {
+        float sigma = Float.parseFloat(retriever.getProperties().getProperty("lfbm.sigma", "1"));
+        for (WordVec wv : qvec.getWordVecMap().values()) {
+            int clusterId = wv.getClusterId();
+            WordVec cvec = wvecs.getCentroidVec(clusterId);
+            float density = (float)(new MultivariateNormalDistribution(cvec.getPoint(), getCovMatrix(cvec, sigma)).density(wv.getPoint()));
+            
+            params.computeSimilarities(query.getLuceneQueryObj(), inMemSearcher, numTopDocs, numTopDocs);
+        }
     }
 }

@@ -43,7 +43,9 @@ public class WVecLFBRetriever {
         wvecs = new WordVecs(prop);
         searcher = new IndexSearcher(reader);
     }
-        
+
+    public Properties getProperties() { return prop; }
+    
     public void trainModel() throws Exception {
         TopScoreDocCollector collector;
         TopDocs topDocs = null;

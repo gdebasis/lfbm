@@ -29,12 +29,13 @@ public class DocVec {
         for (WeightedTerm wterm: qterms) {
             WordVec qwv = wvecs.getVec(wterm.getTerm());
             if (qwv != null) {
-                wvecMap.put(qwv.getWord(), qwv);
+                qwv.setClusterId(wvecs.getClusterId(qwv.getWord()));
+                wvecMap.put(qwv.getWord(), qwv);                
             }
         }
     }
     
-    public int getNumClusters() {
-       return 0;
+    public HashMap<String, WordVec> getWordVecMap() {
+        return wvecMap;
     }
 }

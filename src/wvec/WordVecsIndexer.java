@@ -5,6 +5,7 @@
  */
 package wvec;
 
+import static indexer.CompressionUtils.compress;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -18,6 +19,7 @@ import org.apache.commons.math3.ml.distance.DistanceMeasure;
 import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
+import org.apache.lucene.document.StoredField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
@@ -55,7 +57,8 @@ public class WordVecsIndexer {
     String indexPath;
     
     static final public String FIELD_WORD_NAME = "wordname";
-    static final public String FIELD_WORD_VEC = "wordvec";
+    static final public String FIELD_WORD_VEC = "wordvec"; // cluster-id
+    static final public String FIELD_CENTROID_VEC = "cvec";
 
     public WordVecsIndexer(String propFile) throws Exception {
         prop = new Properties();
@@ -65,8 +68,7 @@ public class WordVecsIndexer {
     
     public Properties getProperties() { return prop; }
 
-    public void writeIndex() throws Exception {
-        
+    public void writeIndex() throws Exception {        
         IndexWriterConfig iwcfg = new IndexWriterConfig(new WhitespaceAnalyzer());
         iwcfg.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
 
@@ -76,12 +78,22 @@ public class WordVecsIndexer {
         indexFile(new File(fileToRead));
         writer.close();        
     }
-    
+
     Document constructDoc(String id, String line) throws Exception {        
         Document doc = new Document();
         doc.add(new Field(FIELD_WORD_NAME, id, Field.Store.YES, Field.Index.NOT_ANALYZED));        
         doc.add(new Field(FIELD_WORD_VEC, line,
                 Field.Store.YES, Field.Index.NOT_ANALYZED, Field.TermVector.NO));
+        return doc;        
+    }
+    
+    // Store the centroid vecs in the index
+    Document constructDoc(String id, String clusterId, WordVec cvec) throws Exception {        
+        Document doc = new Document();
+        doc.add(new Field(FIELD_WORD_NAME, id, Field.Store.YES, Field.Index.NOT_ANALYZED));        
+        doc.add(new Field(FIELD_WORD_VEC, clusterId,
+                Field.Store.YES, Field.Index.NOT_ANALYZED, Field.TermVector.NO));
+        doc.add(new StoredField(FIELD_CENTROID_VEC, compress(cvec.toString())));
         return doc;        
     }
 
@@ -130,9 +142,10 @@ public class WordVecsIndexer {
         System.out.println("Writing out cluster ids in Lucene index...");
         int clusterId = 0;
         for (CentroidCluster<WordVec> c : clusters) {
+            WordVec cvec = (WordVec)c.getCenter();
             List<WordVec> pointsInThisClusuter = c.getPoints();
             for (WordVec thisPoint: pointsInThisClusuter) {
-                Document clusterInfo = constructDoc(thisPoint.word, String.valueOf(clusterId));
+                Document clusterInfo = constructDoc(thisPoint.word, String.valueOf(clusterId), cvec);
                 clusterIndexWriter.addDocument(clusterInfo);
             }
             clusterId++;
