@@ -48,6 +48,8 @@ public class WordVecs {
     IndexReader reader;
     IndexSearcher searcher;
     IndexReader clusterInfoReader;
+    CentroidInfo centroidInfo;
+    int numClusters;
     
     HashMap<String, Integer> clusterMap = new HashMap();
     
@@ -59,9 +61,9 @@ public class WordVecs {
         reader = DirectoryReader.open(FSDirectory.open(indexDir.toPath()));
         searcher = new IndexSearcher(reader);
         
-        int numVocabClusters = Integer.parseInt(prop.getProperty("retrieve.vocabcluster.numclusters", "0"));
-        if (numVocabClusters > 0) {
-            String clusterInfoIndexPath = prop.getProperty("wvecs.clusterids.basedir") + "/" + numVocabClusters;
+        int numClusters = Integer.parseInt(prop.getProperty("retrieve.vocabcluster.numclusters", "0"));
+        if (numClusters > 0) {
+            String clusterInfoIndexPath = prop.getProperty("wvecs.clusterids.basedir") + "/" + numClusters;
             clusterInfoReader = DirectoryReader.open(FSDirectory.open(new File(clusterInfoIndexPath).toPath()));
         }
         
@@ -72,8 +74,17 @@ public class WordVecs {
             String wordName = d.get(WordVecsIndexer.FIELD_WORD_NAME);
             int clusterId = Integer.parseInt(d.get(WordVecsIndexer.FIELD_WORD_VEC));
             clusterMap.put(wordName, clusterId);
-        }        
+        }
+        
+        clusterInfoReader.close();
+        
+        centroidInfo = new CentroidInfo(this);
+        centroidInfo.buildCentroids();
     }
+    
+    public int getNumClusters() { return numClusters; }
+    
+    public CentroidInfo getCentroidInfo() { return centroidInfo; }
 
     // Get the stored centroid vec corresponding to this cluster id
     public WordVec getCentroidVec(int clusterId) throws Exception {

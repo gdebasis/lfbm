@@ -6,6 +6,7 @@
 package linearft;
 
 import indexer.TrecDocIndexer;
+import java.util.List;
 import org.apache.commons.math3.distribution.MultivariateNormalDistribution;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
@@ -49,10 +50,7 @@ public class WvecReranker {
         qvec = new DocVec(wvecs, query.luceneQuery);
         this.topDocs = topDocs;
         
-        int numClusters = Integer.parseInt(
-                wvecs.getProperties().getProperty("wvecs.numclusters"));
-        
-        params = new ParameterVectors(numClusters);
+        params = new ParameterVectors(this.wvecs);
         params.initRandom();
         
         inMemReader = DirectoryReader.open(buildInMemIndex());
@@ -60,7 +58,7 @@ public class WvecReranker {
     }
     
     // Useful to compute similarities with different models for reranking
-    Directory buildInMemIndex() throws Exception {
+    final Directory buildInMemIndex() throws Exception {
         Directory ramdir = new RAMDirectory();
         Analyzer analyzer = TrecDocIndexer.constructAnalyzer();
         IndexWriterConfig iwcfg = new IndexWriterConfig(analyzer);
@@ -94,12 +92,23 @@ public class WvecReranker {
     
     public void rerank() throws Exception {
         float sigma = Float.parseFloat(retriever.getProperties().getProperty("lfbm.sigma", "1"));
-        for (WordVec wv : qvec.getWordVecMap().values()) {
+        
+        for (WordVec wv : qvec.getWordVecMap().values()) { // Iterate over each query term
+            
             int clusterId = wv.getClusterId();
+            // It may be the case that we don't have a trained optimal
+            // parameter for this query term. To allow for a soft match
+            // over weighted word class types, get the k nearest cluster
+            // centres of this word vector and the parameter value at this
+            // word vector is then a linear combination of the k parameter
+            // vectors weighted by their distances from this point.
+            
+            List<WordVec> nncvecs = wvecs.getCentroidInfo().getNearestClusterCentres(wv);
+            
             WordVec cvec = wvecs.getCentroidVec(clusterId);
             float density = (float)(new MultivariateNormalDistribution(cvec.getPoint(), getCovMatrix(cvec, sigma)).density(wv.getPoint()));
             
-            params.computeSimilarities(query.getLuceneQueryObj(), inMemSearcher, numTopDocs, numTopDocs);
+            params.computeSimilarities(query.getLuceneQueryObj(), nncvecs, inMemSearcher, numTopDocs);
         }
     }
 }

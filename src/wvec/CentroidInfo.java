@@ -18,32 +18,11 @@ import org.apache.lucene.store.FSDirectory;
  * 
  * @author Debasis
  */
-
-class PartialSumVec implements Comparable<PartialSumVec> {
-    WordVec sumvec;
-    int nvecs;
-    float distWithQuery;
-    
-    public PartialSumVec(WordVec wv) throws Exception {
-        sumvec = new WordVec(wv.getDimension()); // zero vec
-    }
-    
-    public void add(WordVec wv) {
-        sumvec = WordVec.centroid(sumvec, wv);
-        nvecs++;
-    }
-
-    @Override
-    public int compareTo(PartialSumVec that) {
-        return Float.compare(distWithQuery, that.distWithQuery);
-    }
-}
-
 public class CentroidInfo {
     WordVecs wvecs;
     Properties prop;
     IndexReader clusterInfoReader;
-    HashMap<Integer, PartialSumVec> partialSumVecMap;  // map partial sum vecs for each cluster
+    HashMap<Integer, CentroidVec> partialSumVecMap;  // map partial sum vecs for each cluster
 
     public CentroidInfo(WordVecs wvecs) throws Exception {
         this.prop = wvecs.getProperties();
@@ -64,17 +43,17 @@ public class CentroidInfo {
             String wordName = d.get(WordVecsIndexer.FIELD_WORD_NAME);
             int clusterId = Integer.parseInt(d.get(WordVecsIndexer.FIELD_WORD_VEC));
             
-            PartialSumVec partialSumVec = partialSumVecMap.get(clusterId);
+            CentroidVec partialSumVec = partialSumVecMap.get(clusterId);
             WordVec wv = wvecs.getVec(wordName);
             if (partialSumVec == null) {
-                partialSumVec = new PartialSumVec(wv);
+                partialSumVec = new CentroidVec(wv, clusterId);
             }
             partialSumVec.add(wv);
             partialSumVecMap.put(clusterId, partialSumVec);
         }        
         
         // Build the list of centroids
-        for (PartialSumVec psv : partialSumVecMap.values()) {
+        for (CentroidVec psv : partialSumVecMap.values()) {
             psv.sumvec.scalarMutiply(1/(float)numDocs);
         }
         
@@ -82,15 +61,21 @@ public class CentroidInfo {
     }
     
     // Get the nearest centroids
-    List<PartialSumVec> getNearestClusterCentres(WordVec queryTermVec) {
-        List<PartialSumVec> psvList = new ArrayList<>(partialSumVecMap.size());
+    public List<WordVec> getNearestClusterCentres(WordVec queryTermVec) {
+        List<CentroidVec> psvList = new ArrayList<>(partialSumVecMap.size());
         int k = Integer.parseInt(prop.getProperty("lfbm.knn.clusters", "5"));
         
-        for (PartialSumVec cvec : partialSumVecMap.values()) {
+        for (CentroidVec cvec : partialSumVecMap.values()) {
             cvec.distWithQuery = queryTermVec.euclideanDist(cvec.sumvec);
             psvList.add(cvec);
         }
         Collections.sort(psvList);        
-        return psvList.subList(0, k);
+        psvList = psvList.subList(0, k);
+        
+        List<WordVec> nncvecs = new ArrayList<>();
+        for (CentroidVec psv: psvList) {
+            nncvecs.add(psv.sumvec);
+        }
+        return nncvecs;
     }
 }

@@ -5,6 +5,9 @@
  */
 package linearft;
 
+import java.io.FileReader;
+import java.util.List;
+import java.util.Properties;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
@@ -22,6 +25,8 @@ import org.apache.lucene.search.similarities.LambdaDF;
 import org.apache.lucene.search.similarities.NormalizationH3;
 import org.apache.lucene.search.similarities.NormalizationZ;
 import org.apache.lucene.search.similarities.Similarity;
+import wvec.WordVec;
+import wvec.WordVecs;
 
 /**
  * Stores the entire set of parameter vectors for all clusters.
@@ -32,6 +37,7 @@ public class ParameterVectors {
     int numClusters;
     float[][] parameters;
     float[] features;
+    WordVecs wvecs;
     
     static final Similarity[] sims = {
         new BM25Similarity(),
@@ -42,8 +48,8 @@ public class ParameterVectors {
     };
     static final int NUM_MODELS = sims.length;
     
-    public ParameterVectors(int numClusters) {
-        this.numClusters = numClusters;
+    public ParameterVectors(WordVecs wvecs) {
+        this.numClusters = wvecs.getNumClusters();
         parameters = new float[numClusters][NUM_MODELS];
     }
     
@@ -72,18 +78,39 @@ public class ParameterVectors {
             System.out.println("");
         }
     }
-    
-    TopDocs computeSimilarities(Query query, IndexSearcher searcher, int numTopDocs, int clusterId) throws Exception {
-        Similarity sim = sims[clusterId];
-        searcher.setSimilarity(sim);
-        TopDocs topDocs = searcher.search(query, numTopDocs);
+        
+    TopDocs computeSimilarities(Query query, List<WordVec> nncvecs, IndexSearcher searcher, int numTopDocs) throws Exception {
+        TopDocs topDocs = null;
+        for (WordVec ccvec : nncvecs) {
+            int clusterId = ccvec.getClusterId();
+            Similarity sim = sims[clusterId];
+            searcher.setSimilarity(sim);
+            topDocs = searcher.search(query, numTopDocs);
+        }
         return topDocs;
     }
 
-    public static void main(String[] args) {
-        ParameterVectors params = new ParameterVectors(2);
-        params.initRandom();
-        params.showMatrix();
+    public static void main(String[] args) {        
+        try {
+            if (args.length < 1) {
+                args = new String[1];
+                args[0] = "init.properties";
+            }
+            
+            Properties prop = new Properties();
+            prop.load(new FileReader(args[0]));
+            WordVecs wvecs = new WordVecs(prop);
+            
+            ParameterVectors params = new ParameterVectors(wvecs);
+            params.initRandom();
+            params.showMatrix();
+            
+            wvecs.close();
+        }
+        catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        
     }
     
 }
