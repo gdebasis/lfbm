@@ -6,6 +6,7 @@
 package linearft;
 
 import java.io.FileReader;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import org.apache.lucene.index.IndexReader;
@@ -81,11 +82,14 @@ public class ParameterVectors {
         
     TopDocs computeSimilarities(Query query, List<WordVec> nncvecs, IndexSearcher searcher, int numTopDocs) throws Exception {
         TopDocs topDocs = null;
+        List<TopDocs> topDocsArray = new ArrayList<>(nncvecs.size());
+        
         for (WordVec ccvec : nncvecs) {
             int clusterId = ccvec.getClusterId();
             Similarity sim = sims[clusterId];
             searcher.setSimilarity(sim);
             topDocs = searcher.search(query, numTopDocs);
+            topDocsArray.add(topDocs);
         }
         return topDocs;
     }
